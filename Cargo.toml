@@ -1,0 +1,9 @@
+[package]
+name = "lev"
+version = "0.1.0"
+authors = ["softprops <d.tangren@gmail.com>"]
+
+[dependencies]
+rusoto_lambda = "0.32"
+structopt = "0.2"
+failure = "0.1"
