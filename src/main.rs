@@ -12,8 +12,8 @@ use std::str::FromStr;
 // Third party
 use failure::Error;
 use rusoto_lambda::{
-    Environment, GetFunctionConfigurationError, GetFunctionConfigurationRequest, Lambda,
-    LambdaClient, UpdateFunctionConfigurationRequest,
+    Environment, FunctionConfiguration, GetFunctionConfigurationError,
+    GetFunctionConfigurationRequest, Lambda, LambdaClient, UpdateFunctionConfigurationRequest,
 };
 use structopt::StructOpt;
 
@@ -30,16 +30,16 @@ where
 }
 
 #[derive(Debug, Fail)]
-enum LamdaError {
+enum LambdaError {
     #[fail(display = "failed to get function config")]
     GetConfig,
     #[fail(display = "failed to update function config")]
     UpdateConfig,
 }
 
-#[derive(StructOpt)]
+#[derive(StructOpt, PartialEq, Debug)]
 #[structopt(name = "lev", about = "AWS lambda env manager")]
-enum App {
+enum Options {
     #[structopt(name = "get", about = "Gets a function's current env")]
     Get {
         #[structopt(short = "f", long = "function")]
@@ -61,10 +61,15 @@ enum App {
     },
 }
 
-fn env<F>(
-    lambda: &Lambda,
-    function: F,
-) -> Result<HashMap<String, String>, GetFunctionConfigurationError>
+type Env = HashMap<String, String>;
+
+fn env(conf: FunctionConfiguration) -> Env {
+    conf.environment
+        .map(|env| env.variables.unwrap_or_default())
+        .unwrap_or_default()
+}
+
+fn get<F>(lambda: &Lambda, function: F) -> Result<Env, GetFunctionConfigurationError>
 where
     F: Into<String>,
 {
@@ -74,27 +79,18 @@ where
             ..Default::default()
         })
         .sync()
-        .map(|response| {
-            response
-                .environment
-                .map(|env| env.variables.unwrap_or_default())
-                .unwrap_or_default()
-        })
+        .map(env)
 }
 
-fn set<F>(
-    lambda: &Lambda,
-    function: F,
-    vars: Vec<(String, String)>,
-) -> Result<HashMap<String, String>, LamdaError>
+fn set<F>(lambda: &Lambda, function: F, vars: Vec<(String, String)>) -> Result<Env, LambdaError>
 where
     F: Into<String>,
 {
     let function = function.into();
-    env(lambda, function.as_str())
-        .map_err(|_| LamdaError::GetConfig)
-        .and_then(|env| {
-            let updated = env.into_iter().chain(vars).collect();
+    get(lambda, function.as_str())
+        .map_err(|_| LambdaError::GetConfig)
+        .and_then(|current| {
+            let updated = current.into_iter().chain(vars).collect();
             lambda
                 .update_function_configuration(&UpdateFunctionConfigurationRequest {
                     function_name: function,
@@ -104,29 +100,21 @@ where
                     ..Default::default()
                 })
                 .sync()
-                .map_err(|_| LamdaError::UpdateConfig)
-                .map(|response| {
-                    response
-                        .environment
-                        .map(|env| env.variables.unwrap_or_default())
-                        .unwrap_or_default()
-                })
+                .map(env)
+                .map_err(|_| LambdaError::UpdateConfig)
         })
 }
 
-fn unset<F>(
-    lambda: &Lambda,
-    function: F,
-    names: Vec<String>,
-) -> Result<HashMap<String, String>, LamdaError>
+fn unset<F>(lambda: &Lambda, function: F, names: Vec<String>) -> Result<Env, LambdaError>
 where
     F: Into<String>,
 {
     let function = function.into();
-    env(lambda, function.as_str())
-        .map_err(|_| LamdaError::GetConfig)
-        .and_then(|env| {
-            let updated = env.into_iter()
+    get(lambda, function.as_str())
+        .map_err(|_| LambdaError::GetConfig)
+        .and_then(|current| {
+            let updated = current
+                .into_iter()
                 .filter(|(k, _)| !names.contains(k))
                 .collect();
             lambda
@@ -138,35 +126,69 @@ where
                     ..Default::default()
                 })
                 .sync()
-                .map_err(|_| LamdaError::UpdateConfig)
-                .map(|response| {
-                    response
-                        .environment
-                        .map(|env| env.variables.unwrap_or_default())
-                        .unwrap_or_default()
-                })
+                .map(env)
+                .map_err(|_| LambdaError::UpdateConfig)
         })
 }
 
-fn print(env: HashMap<String, String>) {
+fn print(env: Env) {
     for (k, v) in env {
         println!("{}={}", k, v)
     }
 }
 
 fn main() -> Result<(), Error> {
-    match App::from_args() {
-        App::Get { function } => print(env(&LambdaClient::simple(Default::default()), function)?),
-        App::Set { function, vars } => print(set(
+    match Options::from_args() {
+        Options::Get { function } => {
+            print(get(&LambdaClient::simple(Default::default()), function)?)
+        }
+        Options::Set { function, vars } => print(set(
             &LambdaClient::simple(Default::default()),
             function,
             vars,
         )?),
-        App::Unset { function, names } => print(unset(
+        Options::Unset { function, names } => print(unset(
             &LambdaClient::simple(Default::default()),
             function,
             names,
         )?),
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Options;
+    use structopt::StructOpt;
+    #[test]
+    fn get_options() {
+        assert_eq!(
+            Options::Get {
+                function: "foo".into()
+            },
+            Options::from_iter(&["lev", "get", "-f", "foo"])
+        )
+    }
+
+    #[test]
+    fn set_options() {
+        assert_eq!(
+            Options::Set {
+                function: "foo".into(),
+                vars: vec![("bar".into(), "baz".into()), ("boom".into(), "zoom".into())],
+            },
+            Options::from_iter(&["lev", "set", "-f", "foo", "bar=baz", "boom=zoom"])
+        )
+    }
+
+    #[test]
+    fn unset_options() {
+        assert_eq!(
+            Options::Unset {
+                function: "foo".into(),
+                names: vec!["bar".into(), "baz".into()],
+            },
+            Options::from_iter(&["lev", "unset", "-f", "foo", "bar", "baz"])
+        )
+    }
 }
