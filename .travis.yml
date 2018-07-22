@@ -55,7 +55,7 @@ before_deploy:
 deploy:
   provider: releases
   file_glob: true
-  file: $CRATE_NAME-$TRAVIS_TAG-$TARGET.tar.gz
+  file: $CRATE_NAME-$TRAVIS_TAG-$OS-$ARCH.tar.gz
   api_key: $GH_TOKEN
   skip_cleanup: true
   on:
