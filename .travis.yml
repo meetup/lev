@@ -21,6 +21,8 @@ matrix:
     - cargo test --locked
     - rustup component add rustfmt-preview
     - cargo fmt --all -- --check
+    # nightly for rustfmt --check
+    rust: nightly
     env: RUST_BACKTRACE=1
 
   # dist linux binary
