@@ -46,6 +46,22 @@ addons:
   apt:
     packages:
     - musl-tools
+    # required by tarpaulin code coverage tool
+    - libssl-dev
+
+install: |
+  if [[ "$TRAVIS_RUST_VERSION" == stable ]] && [[ $(cargo tarpaulin --version) != *0.6.2 ]]; then
+    `RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install  --force --version 0.6.2  cargo-tarpaulin`
+  fi
+
+after_success:
+  # report coverage to coveralls
+  # see https://github.com/xd009642/tarpaulin for more information
+  - '[ $TRAVIS_EVENT_TYPE != "cron" ] &&
+    [ $TRAVIS_RUST_VERSION = stable ] &&
+    [ $TRAVIS_BRANCH = master ] &&
+    [ $TRAVIS_PULL_REQUEST = false ] &&
+    cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID || true'
 
 before_deploy:
 - name="$CRATE_NAME-$TRAVIS_TAG-$OS-$ARCH"
