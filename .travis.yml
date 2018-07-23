@@ -1,6 +1,6 @@
 # lifted release strategy from https://raw.githubusercontent.com/rustwasm/wasm-pack/master/.travis.yml
 language: rust
-sudo: false
+sudo: required
 
 cache:
   cargo: true
