@@ -20,9 +20,7 @@ matrix:
     # --locked => Require Cargo.lock is up to date
     - cargo test --locked
     - rustup component add rustfmt-preview
-    - cargo fmt --all -- --check
-    # nightly for rustfmt --check
-    rust: nightly
+    - cargo fmt --all -- --write-mode check
     env: RUST_BACKTRACE=1
 
   # dist linux binary
