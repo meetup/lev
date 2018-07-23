@@ -6,7 +6,6 @@ cache:
   cargo: true
   apt: true
 
-
 env:
   global:
     - CRATE_NAME=lev
