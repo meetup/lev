@@ -33,12 +33,12 @@ matrix:
         make -j$(nproc) &&
         make install)
       - export OPENSSL_DIR=$HOME/openssl-musl
-    script: cargo build --release --target $TARGET --locked
+    script: cargo build --release --target $TARGET --locked -- -C lto
 
   # dist OSX binary
   - os: osx
     env: MACOSX_DEPLOYMENT_TARGET=10.7 TARGET=x86_64-apple-darwin OS=Darwin DEPLOY=1
-    script: cargo build --release --target $TARGET --locked
+    script: cargo build --release --target $TARGET --locked -- -C lto
     install: true
 
 addons:
