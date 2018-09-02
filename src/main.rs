@@ -79,11 +79,12 @@ fn env(conf: FunctionConfiguration) -> Env {
         .unwrap_or_default()
 }
 
-fn get<F>(
-    lambda: Arc<LambdaClient>,
+fn get<L, F>(
+    lambda: Arc<L>,
     function: F,
 ) -> impl Future<Item = Env, Error = GetFunctionConfigurationError> + Send
 where
+    L: Lambda + Send,
     F: Into<String>,
 {
     lambda
@@ -94,12 +95,13 @@ where
         .map(env)
 }
 
-fn set<F>(
-    lambda: Arc<LambdaClient>,
+fn set<L, F>(
+    lambda: Arc<L>,
     function: F,
     vars: Vec<(String, String)>,
 ) -> impl Future<Item = Env, Error = LambdaError> + Send
 where
+    L: Lambda + Send + Sync,
     F: Into<String>,
 {
     let function = function.into();
@@ -120,12 +122,13 @@ where
         })
 }
 
-fn unset<F>(
-    lambda: Arc<LambdaClient>,
+fn unset<L, F>(
+    lambda: Arc<L>,
     function: F,
     names: Vec<String>,
 ) -> impl Future<Item = Env, Error = LambdaError> + Send
 where
+    L: Lambda + Send + Sync,
     F: Into<String>,
 {
     let function = function.into();
