@@ -108,7 +108,6 @@ where
         .and_then(move |current| {
             let updated = current.into_iter().chain(vars).collect();
             lambda
-                .clone()
                 .update_function_configuration(UpdateFunctionConfigurationRequest {
                     function_name: function,
                     environment: Some(Environment {
@@ -138,7 +137,6 @@ where
                 .filter(|(k, _)| !names.contains(k))
                 .collect();
             lambda
-                .clone()
                 .update_function_configuration(UpdateFunctionConfigurationRequest {
                     function_name: function,
                     environment: Some(Environment {
