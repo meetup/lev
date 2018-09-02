@@ -3,19 +3,28 @@ extern crate structopt;
 extern crate rusoto_lambda;
 #[macro_use]
 extern crate failure;
+extern crate futures;
+extern crate rusoto_core;
+extern crate tokio;
 
 // Std
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
 
 // Third party
 use failure::Error;
+use futures::Future;
+use rusoto_core::credential::ChainProvider;
+use rusoto_core::request::HttpClient;
 use rusoto_lambda::{
     Environment, FunctionConfiguration, GetFunctionConfigurationError,
     GetFunctionConfigurationRequest, Lambda, LambdaClient, UpdateFunctionConfigurationRequest,
 };
 use structopt::StructOpt;
+use tokio::runtime::Runtime;
 
 fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<std::error::Error>>
 where
@@ -24,7 +33,8 @@ where
     U: FromStr,
     U::Err: StdError + 'static,
 {
-    let pos = s.find('=')
+    let pos = s
+        .find('=')
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
@@ -69,91 +79,117 @@ fn env(conf: FunctionConfiguration) -> Env {
         .unwrap_or_default()
 }
 
-fn get<F>(lambda: &Lambda, function: F) -> Result<Env, GetFunctionConfigurationError>
+fn get<F>(
+    lambda: Arc<LambdaClient>,
+    function: F,
+) -> impl Future<Item = Env, Error = GetFunctionConfigurationError> + Send
 where
     F: Into<String>,
 {
     lambda
-        .get_function_configuration(&GetFunctionConfigurationRequest {
+        .get_function_configuration(GetFunctionConfigurationRequest {
             function_name: function.into(),
             ..Default::default()
         })
-        .sync()
         .map(env)
 }
 
-fn set<F>(lambda: &Lambda, function: F, vars: Vec<(String, String)>) -> Result<Env, LambdaError>
+fn set<F>(
+    lambda: Arc<LambdaClient>,
+    function: F,
+    vars: Vec<(String, String)>,
+) -> impl Future<Item = Env, Error = LambdaError> + Send
 where
     F: Into<String>,
 {
     let function = function.into();
-    get(lambda, function.as_str())
+    get(lambda.clone(), function.clone())
         .map_err(|_| LambdaError::GetConfig)
-        .and_then(|current| {
+        .and_then(move |current| {
             let updated = current.into_iter().chain(vars).collect();
             lambda
-                .update_function_configuration(&UpdateFunctionConfigurationRequest {
+                .clone()
+                .update_function_configuration(UpdateFunctionConfigurationRequest {
                     function_name: function,
                     environment: Some(Environment {
                         variables: Some(updated),
                     }),
                     ..Default::default()
                 })
-                .sync()
                 .map(env)
                 .map_err(|_| LambdaError::UpdateConfig)
         })
 }
 
-fn unset<F>(lambda: &Lambda, function: F, names: Vec<String>) -> Result<Env, LambdaError>
+fn unset<F>(
+    lambda: Arc<LambdaClient>,
+    function: F,
+    names: Vec<String>,
+) -> impl Future<Item = Env, Error = LambdaError> + Send
 where
     F: Into<String>,
 {
     let function = function.into();
-    get(lambda, function.as_str())
+    get(lambda.clone(), function.clone())
         .map_err(|_| LambdaError::GetConfig)
-        .and_then(|current| {
+        .and_then(move |current| {
             let updated = current
                 .into_iter()
                 .filter(|(k, _)| !names.contains(k))
                 .collect();
             lambda
-                .update_function_configuration(&UpdateFunctionConfigurationRequest {
+                .clone()
+                .update_function_configuration(UpdateFunctionConfigurationRequest {
                     function_name: function,
                     environment: Some(Environment {
                         variables: Some(updated),
                     }),
                     ..Default::default()
                 })
-                .sync()
                 .map(env)
                 .map_err(|_| LambdaError::UpdateConfig)
         })
 }
 
-fn print(env: Env) {
+fn render(env: Env) {
     for (k, v) in env {
         println!("{}={}", k, v)
     }
 }
 
+fn credentials() -> ChainProvider {
+    let mut chain = ChainProvider::new();
+    chain.set_timeout(Duration::from_millis(200));
+    chain
+}
+
+fn lambda_client() -> LambdaClient {
+    LambdaClient::new_with(
+        HttpClient::new().expect("failed to create request dispatcher"),
+        credentials(),
+        Default::default(),
+    )
+}
+
 fn main() -> Result<(), Error> {
+    let mut rt = Runtime::new().expect("failed to initialize runtime");
     match Options::from_args() {
-        Options::Get { function } => {
-            print(get(&LambdaClient::simple(Default::default()), function)?)
-        }
-        Options::Set { function, vars } => print(set(
-            &LambdaClient::simple(Default::default()),
-            function,
-            vars,
-        )?),
-        Options::Unset { function, names } => print(unset(
-            &LambdaClient::simple(Default::default()),
-            function,
-            names,
-        )?),
+        Options::Get { function } => rt.block_on(
+            get(Arc::new(lambda_client()), function)
+                .map_err(Error::from)
+                .map(render),
+        ),
+        Options::Set { function, vars } => rt.block_on(
+            set(Arc::new(lambda_client()), function, vars)
+                .map_err(Error::from)
+                .map(render),
+        ),
+        Options::Unset { function, names } => rt.block_on(
+            unset(Arc::new(lambda_client()), function, names)
+                .map_err(Error::from)
+                .map(render),
+        ),
     }
-    Ok(())
 }
 
 #[cfg(test)]
