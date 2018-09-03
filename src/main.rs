@@ -185,9 +185,9 @@ fn lambda_client() -> LambdaClient {
     )
 }
 
-fn main() -> Result<(), Error> {
+fn main() {
     let mut rt = Runtime::new().expect("failed to initialize runtime");
-    match Options::from_args() {
+    let result = match Options::from_args() {
         Options::Get { function } => rt.block_on(
             get(Arc::new(lambda_client()), function)
                 .map_err(Error::from)
@@ -203,6 +203,12 @@ fn main() -> Result<(), Error> {
                 .map_err(Error::from)
                 .map(render),
         ),
+    };
+    if let Err(err) = result {
+        for cause in err.causes() {
+            eprintln!("{}", cause);
+        }
+        ::std::process::exit(1);
     }
 }
 
