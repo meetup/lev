@@ -21,7 +21,8 @@ use rusoto_core::credential::ChainProvider;
 use rusoto_core::request::HttpClient;
 use rusoto_lambda::{
     Environment, FunctionConfiguration, GetFunctionConfigurationError,
-    GetFunctionConfigurationRequest, Lambda, LambdaClient, UpdateFunctionConfigurationRequest,
+    GetFunctionConfigurationRequest, Lambda, LambdaClient, UpdateFunctionConfigurationError,
+    UpdateFunctionConfigurationRequest,
 };
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
@@ -41,10 +42,22 @@ where
 
 #[derive(Debug, Fail)]
 enum LambdaError {
-    #[fail(display = "failed to get function config")]
-    GetConfig,
-    #[fail(display = "failed to update function config")]
-    UpdateConfig,
+    #[fail(display = "{}", _0)]
+    GetConfig(#[cause] GetFunctionConfigurationError),
+    #[fail(display = "{}", _0)]
+    UpdateConfig(#[cause] UpdateFunctionConfigurationError),
+}
+
+impl From<GetFunctionConfigurationError> for LambdaError {
+    fn from(err: GetFunctionConfigurationError) -> Self {
+        LambdaError::GetConfig(err)
+    }
+}
+
+impl From<UpdateFunctionConfigurationError> for LambdaError {
+    fn from(err: UpdateFunctionConfigurationError) -> Self {
+        LambdaError::UpdateConfig(err)
+    }
 }
 
 #[derive(StructOpt, PartialEq, Debug)]
@@ -106,7 +119,7 @@ where
 {
     let function = function.into();
     get(lambda.clone(), function.clone())
-        .map_err(|_| LambdaError::GetConfig)
+        .map_err(LambdaError::from)
         .and_then(move |current| {
             let updated = current.into_iter().chain(vars).collect();
             lambda
@@ -118,7 +131,7 @@ where
                     ..Default::default()
                 })
                 .map(env)
-                .map_err(|_| LambdaError::UpdateConfig)
+                .map_err(LambdaError::from)
         })
 }
 
@@ -133,7 +146,7 @@ where
 {
     let function = function.into();
     get(lambda.clone(), function.clone())
-        .map_err(|_| LambdaError::GetConfig)
+        .map_err(LambdaError::from)
         .and_then(move |current| {
             let updated = current
                 .into_iter()
@@ -148,7 +161,7 @@ where
                     ..Default::default()
                 })
                 .map(env)
-                .map_err(|_| LambdaError::UpdateConfig)
+                .map_err(LambdaError::from)
         })
 }
 
