@@ -198,8 +198,38 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::Options;
+    use super::{env, Options};
+    use rusoto_lambda::{EnvironmentResponse, FunctionConfiguration};
+    use std::collections::HashMap;
+
     use structopt::StructOpt;
+
+    #[test]
+    fn env_extracts_from_empty_config() {
+        assert_eq!(
+            env(FunctionConfiguration {
+                ..Default::default()
+            }),
+            Default::default()
+        )
+    }
+
+    #[test]
+    fn env_extracts_from_nonempty_config() {
+        let mut vars = HashMap::new();
+        vars.insert("foo".to_string(), "bar".to_string());
+        assert_eq!(
+            env(FunctionConfiguration {
+                environment: Some(EnvironmentResponse {
+                    variables: Some(vars.clone()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            vars
+        )
+    }
+
     #[test]
     fn get_options() {
         assert_eq!(
