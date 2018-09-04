@@ -10,12 +10,13 @@ extern crate tokio;
 // Std
 use std::collections::HashMap;
 use std::error::Error as StdError;
+use std::process::exit;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 // Third party
-use failure::Error;
+use failure::Fail;
 use futures::Future;
 use rusoto_core::credential::ChainProvider;
 use rusoto_core::request::HttpClient;
@@ -190,25 +191,25 @@ fn main() {
     let result = match Options::from_args() {
         Options::Get { function } => rt.block_on(
             get(Arc::new(lambda_client()), function)
-                .map_err(Error::from)
+                .map_err(LambdaError::from)
                 .map(render),
         ),
         Options::Set { function, vars } => rt.block_on(
             set(Arc::new(lambda_client()), function, vars)
-                .map_err(Error::from)
+                .map_err(LambdaError::from)
                 .map(render),
         ),
         Options::Unset { function, names } => rt.block_on(
             unset(Arc::new(lambda_client()), function, names)
-                .map_err(Error::from)
+                .map_err(LambdaError::from)
                 .map(render),
         ),
     };
     if let Err(err) = result {
-        for cause in err.causes() {
+        for cause in Fail::iter_causes(&err) {
             eprintln!("{}", cause);
         }
-        ::std::process::exit(1);
+        exit(1)
     }
 }
 
