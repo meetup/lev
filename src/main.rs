@@ -22,11 +22,14 @@ use rusoto_core::credential::ChainProvider;
 use rusoto_core::request::HttpClient;
 use rusoto_lambda::{
     Environment, FunctionConfiguration, GetFunctionConfigurationError,
-    GetFunctionConfigurationRequest, Lambda, LambdaClient, UpdateFunctionConfigurationError,
-    UpdateFunctionConfigurationRequest,
+    GetFunctionConfigurationRequest, Lambda, LambdaClient, UpdateFunctionConfigurationRequest,
 };
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
+
+// Ours
+mod error;
+use error::Error;
 
 fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<std::error::Error>>
 where
@@ -39,26 +42,6 @@ where
         .find('=')
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
-}
-
-#[derive(Debug, Fail)]
-enum Error {
-    #[fail(display = "{}", _0)]
-    GetConfig(#[cause] GetFunctionConfigurationError),
-    #[fail(display = "{}", _0)]
-    UpdateConfig(#[cause] UpdateFunctionConfigurationError),
-}
-
-impl From<GetFunctionConfigurationError> for Error {
-    fn from(err: GetFunctionConfigurationError) -> Self {
-        Error::GetConfig(err)
-    }
-}
-
-impl From<UpdateFunctionConfigurationError> for Error {
-    fn from(err: UpdateFunctionConfigurationError) -> Self {
-        Error::UpdateConfig(err)
-    }
 }
 
 #[derive(StructOpt, PartialEq, Debug)]
