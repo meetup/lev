@@ -1,4 +1,4 @@
-# lev [![Build Status](https://travis-ci.org/meetup/lev.svg?branch=master)](https://travis-ci.org/meetup/lev)
+# lev [![Build Status](https://travis-ci.org/meetup/lev.svg?branch=master)](https://travis-ci.org/meetup/lev) [![Coverage Status](https://coveralls.io/repos/github/meetup/lev/badge.svg?branch=master)](https://coveralls.io/github/meetup/lev?branch=master)
 
 > AWS lambda env manager
 
