@@ -42,22 +42,22 @@ where
 }
 
 #[derive(Debug, Fail)]
-enum LambdaError {
+enum Error {
     #[fail(display = "{}", _0)]
     GetConfig(#[cause] GetFunctionConfigurationError),
     #[fail(display = "{}", _0)]
     UpdateConfig(#[cause] UpdateFunctionConfigurationError),
 }
 
-impl From<GetFunctionConfigurationError> for LambdaError {
+impl From<GetFunctionConfigurationError> for Error {
     fn from(err: GetFunctionConfigurationError) -> Self {
-        LambdaError::GetConfig(err)
+        Error::GetConfig(err)
     }
 }
 
-impl From<UpdateFunctionConfigurationError> for LambdaError {
+impl From<UpdateFunctionConfigurationError> for Error {
     fn from(err: UpdateFunctionConfigurationError) -> Self {
-        LambdaError::UpdateConfig(err)
+        Error::UpdateConfig(err)
     }
 }
 
@@ -113,14 +113,14 @@ fn set<L, F>(
     lambda: Arc<L>,
     function: F,
     vars: Vec<(String, String)>,
-) -> impl Future<Item = Env, Error = LambdaError> + Send
+) -> impl Future<Item = Env, Error = Error> + Send
 where
     L: Lambda + Send + Sync,
     F: Into<String>,
 {
     let function = function.into();
     get(lambda.clone(), function.clone())
-        .map_err(LambdaError::from)
+        .map_err(Error::from)
         .and_then(move |current| {
             let updated = current.into_iter().chain(vars).collect();
             lambda
@@ -132,7 +132,7 @@ where
                     ..Default::default()
                 })
                 .map(env)
-                .map_err(LambdaError::from)
+                .map_err(Error::from)
         })
 }
 
@@ -140,14 +140,14 @@ fn unset<L, F>(
     lambda: Arc<L>,
     function: F,
     names: Vec<String>,
-) -> impl Future<Item = Env, Error = LambdaError> + Send
+) -> impl Future<Item = Env, Error = Error> + Send
 where
     L: Lambda + Send + Sync,
     F: Into<String>,
 {
     let function = function.into();
     get(lambda.clone(), function.clone())
-        .map_err(LambdaError::from)
+        .map_err(Error::from)
         .and_then(move |current| {
             let updated = current
                 .into_iter()
@@ -162,7 +162,7 @@ where
                     ..Default::default()
                 })
                 .map(env)
-                .map_err(LambdaError::from)
+                .map_err(Error::from)
         })
 }
 
@@ -191,17 +191,17 @@ fn main() {
     let result = match Options::from_args() {
         Options::Get { function } => rt.block_on(
             get(Arc::new(lambda_client()), function)
-                .map_err(LambdaError::from)
+                .map_err(Error::from)
                 .map(render),
         ),
         Options::Set { function, vars } => rt.block_on(
             set(Arc::new(lambda_client()), function, vars)
-                .map_err(LambdaError::from)
+                .map_err(Error::from)
                 .map(render),
         ),
         Options::Unset { function, names } => rt.block_on(
             unset(Arc::new(lambda_client()), function, names)
-                .map_err(LambdaError::from)
+                .map_err(Error::from)
                 .map(render),
         ),
     };
