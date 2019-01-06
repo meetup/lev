@@ -1,35 +1,20 @@
-#[macro_use]
-extern crate structopt;
-extern crate rusoto_lambda;
-#[macro_use]
-extern crate failure;
-extern crate futures;
-extern crate rusoto_core;
-extern crate tokio;
-
-// Std
-use std::collections::HashMap;
-use std::error::Error as StdError;
-use std::process::exit;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::Duration;
-
-// Third party
 use failure::Fail;
 use futures::Future;
-use rusoto_core::credential::ChainProvider;
-use rusoto_core::request::HttpClient;
+use rusoto_core::{credential::ChainProvider, request::HttpClient};
 use rusoto_lambda::{
     Environment, FunctionConfiguration, GetFunctionConfigurationError,
     GetFunctionConfigurationRequest, Lambda, LambdaClient, UpdateFunctionConfigurationRequest,
+};
+use std::{
+    collections::HashMap, error::Error as StdError, process::exit, str::FromStr, sync::Arc,
+    time::Duration,
 };
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
 
 // Ours
 mod error;
-use error::Error;
+use crate::error::Error;
 
 fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<std::error::Error>>
 where

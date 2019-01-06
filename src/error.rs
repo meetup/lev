@@ -1,3 +1,4 @@
+use failure::Fail;
 use rusoto_lambda::{GetFunctionConfigurationError, UpdateFunctionConfigurationError};
 
 #[derive(Debug, Fail)]
