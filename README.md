@@ -6,7 +6,7 @@
 
 ## Via github releases
 
-Prebuilt binaries for osx and linux are available for download directly from github.com
+Prebuilt binaries for osx and linux are available for download directly from [Github Releases](https://github.com/meetup/lev/releases)
 
 ```bash
 $ curl -L \
