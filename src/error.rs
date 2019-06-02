@@ -1,22 +1,23 @@
 use failure::Fail;
 use rusoto_lambda::{GetFunctionConfigurationError, UpdateFunctionConfigurationError};
+use rusoto_core::RusotoError;
 
 #[derive(Debug, Fail)]
 pub enum Error {
     #[fail(display = "{}", _0)]
-    GetConfig(#[cause] GetFunctionConfigurationError),
+    GetConfig(#[cause] RusotoError<GetFunctionConfigurationError>),
     #[fail(display = "{}", _0)]
-    UpdateConfig(#[cause] UpdateFunctionConfigurationError),
+    UpdateConfig(#[cause] RusotoError<UpdateFunctionConfigurationError>),
 }
 
-impl From<GetFunctionConfigurationError> for Error {
-    fn from(err: GetFunctionConfigurationError) -> Self {
+impl From<RusotoError<GetFunctionConfigurationError>> for Error {
+    fn from(err: RusotoError<GetFunctionConfigurationError>) -> Self {
         Error::GetConfig(err)
     }
 }
 
-impl From<UpdateFunctionConfigurationError> for Error {
-    fn from(err: UpdateFunctionConfigurationError) -> Self {
+impl From<RusotoError<UpdateFunctionConfigurationError>> for Error {
+    fn from(err: RusotoError<UpdateFunctionConfigurationError>) -> Self {
         Error::UpdateConfig(err)
     }
 }
