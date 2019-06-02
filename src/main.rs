@@ -1,13 +1,12 @@
 use failure::Fail;
 use futures::Future;
-use rusoto_core::{credential::ChainProvider, request::HttpClient};
+use rusoto_core::{credential::ChainProvider, request::HttpClient, RusotoError};
 use rusoto_lambda::{
     Environment, FunctionConfiguration, GetFunctionConfigurationError,
     GetFunctionConfigurationRequest, Lambda, LambdaClient, UpdateFunctionConfigurationRequest,
 };
 use std::{
-    collections::HashMap, error::Error as StdError, process::exit, str::FromStr, sync::Arc,
-    time::Duration,
+    collections::HashMap, error::Error as StdError, process::exit, str::FromStr, time::Duration,
 };
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
@@ -61,29 +60,27 @@ fn env(conf: FunctionConfiguration) -> Env {
         .unwrap_or_default()
 }
 
-fn get<L, F>(
-    lambda: Arc<L>,
+fn get<F>(
+    lambda: LambdaClient,
     function: F,
-) -> impl Future<Item = Env, Error = GetFunctionConfigurationError> + Send
+) -> impl Future<Item = Env, Error = RusotoError<GetFunctionConfigurationError>> + Send
 where
-    L: Lambda + Send,
     F: Into<String>,
 {
     lambda
         .get_function_configuration(GetFunctionConfigurationRequest {
             function_name: function.into(),
-            ..Default::default()
+            ..GetFunctionConfigurationRequest::default()
         })
         .map(env)
 }
 
-fn set<L, F>(
-    lambda: Arc<L>,
+fn set<F>(
+    lambda: LambdaClient,
     function: F,
     vars: Vec<(String, String)>,
 ) -> impl Future<Item = Env, Error = Error> + Send
 where
-    L: Lambda + Send + Sync,
     F: Into<String>,
 {
     let function = function.into();
@@ -97,20 +94,19 @@ where
                     environment: Some(Environment {
                         variables: Some(updated),
                     }),
-                    ..Default::default()
+                    ..UpdateFunctionConfigurationRequest::default()
                 })
                 .map(env)
                 .map_err(Error::from)
         })
 }
 
-fn unset<L, F>(
-    lambda: Arc<L>,
+fn unset<F>(
+    lambda: LambdaClient,
     function: F,
     names: Vec<String>,
 ) -> impl Future<Item = Env, Error = Error> + Send
 where
-    L: Lambda + Send + Sync,
     F: Into<String>,
 {
     let function = function.into();
@@ -127,7 +123,7 @@ where
                     environment: Some(Environment {
                         variables: Some(updated),
                     }),
-                    ..Default::default()
+                    ..UpdateFunctionConfigurationRequest::default()
                 })
                 .map(env)
                 .map_err(Error::from)
@@ -158,17 +154,17 @@ fn main() {
     let mut rt = Runtime::new().expect("failed to initialize runtime");
     let result = match Options::from_args() {
         Options::Get { function } => rt.block_on(
-            get(Arc::new(lambda_client()), function)
+            get(lambda_client(), function)
                 .map_err(Error::from)
                 .map(render),
         ),
         Options::Set { function, vars } => rt.block_on(
-            set(Arc::new(lambda_client()), function, vars)
+            set(lambda_client(), function, vars)
                 .map_err(Error::from)
                 .map(render),
         ),
         Options::Unset { function, names } => rt.block_on(
-            unset(Arc::new(lambda_client()), function, names)
+            unset(lambda_client(), function, names)
                 .map_err(Error::from)
                 .map(render),
         ),
@@ -193,7 +189,7 @@ mod tests {
     fn env_extracts_from_empty_config() {
         assert_eq!(
             env(FunctionConfiguration {
-                ..Default::default()
+                ..FunctionConfiguration::default()
             }),
             Default::default()
         )
@@ -207,9 +203,9 @@ mod tests {
             env(FunctionConfiguration {
                 environment: Some(EnvironmentResponse {
                     variables: Some(vars.clone()),
-                    ..Default::default()
+                    ..EnvironmentResponse::default()
                 }),
-                ..Default::default()
+                ..FunctionConfiguration::default()
             }),
             vars
         )
