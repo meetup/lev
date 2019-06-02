@@ -6,8 +6,7 @@ use rusoto_lambda::{
     GetFunctionConfigurationRequest, Lambda, LambdaClient, UpdateFunctionConfigurationRequest,
 };
 use std::{
-    collections::HashMap, error::Error as StdError, process::exit, str::FromStr,
-    time::Duration,
+    collections::HashMap, error::Error as StdError, process::exit, str::FromStr, time::Duration,
 };
 use structopt::StructOpt;
 use tokio::runtime::Runtime;

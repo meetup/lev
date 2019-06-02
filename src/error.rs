@@ -1,6 +1,6 @@
 use failure::Fail;
-use rusoto_lambda::{GetFunctionConfigurationError, UpdateFunctionConfigurationError};
 use rusoto_core::RusotoError;
+use rusoto_lambda::{GetFunctionConfigurationError, UpdateFunctionConfigurationError};
 
 #[derive(Debug, Fail)]
 pub enum Error {
